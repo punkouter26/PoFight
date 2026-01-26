@@ -3,22 +3,52 @@
 import { useEffect, useState, memo } from 'react';
 import { gameLoop } from '@/engine/GameLoop';
 import { FightManager } from '@/engine/FightManager';
-import { FighterView } from './FighterView';
+
 import { HUD } from './HUD';
+import { FighterView } from './FighterView';
 import { GAME_WIDTH, GAME_HEIGHT } from '@/engine/Constants';
+import { cameraSystem } from '@/engine/CameraSystem';
+import { useSignal } from '@/hooks/useSignal';
+import { WebGPUCanvas } from './WebGPUCanvas';
+
+
 
 const GameCanvas = memo(function GameCanvas({ manager }: { manager: FightManager }) {
+    const [renderer, setRenderer] = useState<'webgpu' | 'legacy'>('webgpu');
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const viewBox = useSignal(cameraSystem.viewBox);
+
+    const handleWebGPUError = (e: Error) => {
+        console.warn("WebGPU Error, falling back to Legacy renderer:", e);
+        setErrorMsg(e.message);
+        setRenderer('legacy');
+    };
+
+    if (renderer === 'legacy') {
+        return (
+            <svg
+                viewBox={viewBox}
+                className="w-full h-full max-w-[1920px] max-h-[1080px] bg-gradient-to-b from-slate-900 to-slate-800"
+                xmlns="http://www.w3.org/2000/svg"
+            >
+                {/* Fallback SVG Rendering */}
+                <line x1="0" y1={GAME_HEIGHT - 100} x2={GAME_WIDTH} y2={GAME_HEIGHT - 100} stroke="#334155" strokeWidth="200" />
+                <FighterView fighter={manager.player} />
+                <FighterView fighter={manager.cpu} />
+                <text x="50%" y="50" textAnchor="middle" fill="white" className="opacity-50">Legacy Renderer (WebGPU: {errorMsg})</text>
+            </svg>
+        );
+    }
+
     return (
-        <svg
-            viewBox={`0 0 ${GAME_WIDTH} ${GAME_HEIGHT}`}
-            className="w-full h-full max-w-[1920px] max-h-[1080px] bg-gradient-to-b from-slate-900 to-slate-800"
-            xmlns="http://www.w3.org/2000/svg"
-            style={{ willChange: 'contents' }}
-        >
-            <line x1="0" y1={GAME_HEIGHT - 100} x2={GAME_WIDTH} y2={GAME_HEIGHT - 100} stroke="#334155" strokeWidth="200" />
-            <FighterView fighter={manager.player} />
-            <FighterView fighter={manager.cpu} />
-        </svg>
+        <div className="w-full h-full max-w-[1920px] max-h-[1080px] bg-gradient-to-b from-slate-900 to-slate-800 relative">
+            <WebGPUCanvas
+                fighters={[manager.player, manager.cpu]}
+                onError={handleWebGPUError}
+                onRendererReady={(r) => manager.setRenderer(r)}
+            />
+            {/* Keep HUD as HTML overlay in parent */}
+        </div>
     );
 });
 
@@ -30,12 +60,12 @@ const HUDOverlay = memo(function HUDOverlay({ manager }: { manager: FightManager
     );
 });
 
-export default function Stage() {
+export default function Stage({ gameMode = 'PvCPU' }: { gameMode?: 'PvCPU' | 'CPUvCPU' }) {
     const [manager, setManager] = useState<FightManager | null>(null);
 
     useEffect(() => {
         console.log('Stage: Mount Effect');
-        const mgr = new FightManager(gameLoop);
+        const mgr = new FightManager(gameLoop, gameMode);
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setManager(mgr);
 

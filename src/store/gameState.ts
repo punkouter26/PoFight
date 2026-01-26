@@ -10,6 +10,10 @@ interface GameState {
     setHighScore: (_level: number, _score: number) => void;
     setCurrentLevel: (_level: number) => void;
     resetProgress: () => void;
+    p1FighterId: string;
+    p2FighterId: string;
+    setP1FighterId: (id: string) => void;
+    setP2FighterId: (id: string) => void;
 }
 
 const storage = {
@@ -43,6 +47,10 @@ export const useGameStore = create<GameState>()(
                 })),
             setCurrentLevel: (level) => set({ currentLevel: level }),
             resetProgress: () => set({ unlockedLevels: 1, highScores: {}, currentLevel: 1 }),
+            p1FighterId: 'player',
+            p2FighterId: 'fighter2',
+            setP1FighterId: (id) => set({ p1FighterId: id }),
+            setP2FighterId: (id) => set({ p2FighterId: id }),
         }),
         {
             name: 'pofight-storage',

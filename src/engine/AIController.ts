@@ -1,5 +1,6 @@
 import { Fighter } from './Fighter';
 
+type AIState = 'IDLE' | 'APPROACH' | 'RETREAT' | 'CHARGE' | 'BLOCK' | 'WAIT';
 
 export class AIController {
     private me: Fighter;
@@ -7,63 +8,108 @@ export class AIController {
 
     private mistakeRate: number;
     private aggression: number;
+    private reactionTime: number;
 
-    private nextActionTime: number = 0;
+    private currentState: AIState = 'IDLE';
+    private stateTimer: number = 0;
+    private targetStateTime: number = 0;
+
+    // Output State
+    private currentInput = { x: 0, y: 0, punchHeld: false, kickHeld: false };
+    private holdTimer = 0;
 
     constructor(me: Fighter, opponent: Fighter, level: number) {
         this.me = me;
         this.opponent = opponent;
 
-        // Config based on level
-        // this._reactionDelay = ... (unused)
-        this.mistakeRate = Math.max(0, 0.5 - (level * 0.1)); // Lv1: 50% mistake chance
-        this.aggression = level * 0.2; // Lv1: 0.2, Lv5: 1.0
+        this.mistakeRate = Math.max(0, 0.4 - (level * 0.08));
+        this.aggression = 0.2 + (level * 0.15);
+        this.reactionTime = Math.max(0.1, 0.5 - (level * 0.08));
     }
 
-    public update(_dt: number, _time: number) {
-        if (this.nextActionTime > _time) return;
+    public update(dt: number) {
+        // State Machine Update
+        this.stateTimer += dt;
 
-        // Decide input for this frame based on currentAction
-        // Note: Fighter.setInput is not fully implemented in Fighter.ts yet, we focused on update() loop inputs.
-        // We need to simulate the `input` object that Fighter.update expects.
-        // Ideally Fighter.update takes an input usage object.
+        // Transitions
+        if (this.stateTimer >= this.targetStateTime) {
+            this.decideNextState();
+        }
 
-        // For now, we will return the input object to be fed into the fighter. Since AI is driven frame-by-frame.
-        // This design might need inversion: FightManager asks AI for input.
+        // Behavior per state
+        this.executeState(dt);
     }
 
-    public getInput(): { x: number, y: number, punchHeld: boolean, kickHeld: boolean } {
-        // Simple state machine
+    private decideNextState() {
+        this.stateTimer = 0;
         const dist = Math.abs(this.me.x.value - this.opponent.x.value);
-        const opponentAttacking = this.opponent.state.value === 'ATTACKING' || this.opponent.chargeLevel.value > 0.5;
+        const random = Math.random();
 
-        const input = { x: 0, y: 0, punchHeld: false, kickHeld: false };
-
-        // Defensive Logic
-        if (opponentAttacking) {
-            // Randomly block or mistake based on level
-            if (Math.random() > this.mistakeRate) {
-                // Omni-block high/low heuristic (simplified)
-                // In real game, read opponent modifier? Or guess?
-                // Level 5 reads inputs (cheats?), Level 1 guesses.
-                const guessHigh = Math.random() > 0.5;
-                input.y = guessHigh ? 1 : -1;
-                return input;
+        // 1. Check Danger (React to attack or blocked hit)
+        if (this.opponent.state.value === 'ATTACKING' || this.opponent.chargeLevel.value > 0.3) {
+            if (random > this.mistakeRate) {
+                this.currentState = 'BLOCK';
+                this.targetStateTime = 0.5 + Math.random() * 0.5 + this.reactionTime;
+                return;
             }
         }
 
-        // Offensive Logic
-        if (dist > 150) {
-            input.x = this.me.x.value < this.opponent.x.value ? 1 : -1; // Move towards
+        // 2. Offensive Choice
+        if (dist < 250) {
+            // In range
+            if (random < this.aggression) {
+                this.currentState = 'CHARGE';
+                // Hold logic handled in execute
+                this.targetStateTime = 0.2 + Math.random() * 0.6;
+                this.holdTimer = 0; // Reset hold timer
+            } else if (random < this.aggression + 0.3) {
+                this.currentState = 'RETREAT'; // Bait
+                this.targetStateTime = 0.3;
+            } else {
+                this.currentState = 'IDLE';
+                this.targetStateTime = 0.2;
+            }
         } else {
-            // Attack range
-            if (Math.random() < this.aggression * 0.1) {
-                input.punchHeld = true; // Hold to charge
-                // Release logic needs state memory in AI... 
-                // "Hold-and-Release" requires AI to hold for frames.
+            // Out of range
+            if (random < 0.7) {
+                this.currentState = 'APPROACH';
+                this.targetStateTime = 1.0;
+            } else {
+                this.currentState = 'WAIT';
+                this.targetStateTime = 0.5;
             }
         }
+    }
 
-        return input;
+    private executeState(dt: number) {
+        this.currentInput = { x: 0, y: 0, punchHeld: false, kickHeld: false };
+
+        const directionToOpponent = this.opponent.x.value > this.me.x.value ? 1 : -1;
+
+        switch (this.currentState) {
+            case 'APPROACH':
+                this.currentInput.x = directionToOpponent;
+                break;
+            case 'RETREAT':
+                this.currentInput.x = -directionToOpponent;
+                break;
+            case 'BLOCK':
+                this.currentInput.y = 1; // High block default
+                if (this.opponent.attackHeight.peek() === 'LOW' && Math.random() > this.mistakeRate) {
+                    this.currentInput.y = -1;
+                }
+                break;
+            case 'CHARGE':
+                this.currentInput.punchHeld = true;
+                this.holdTimer += dt;
+                break;
+            case 'WAIT':
+            case 'IDLE':
+                break;
+        }
+    }
+
+    public getInput() {
+        return this.currentInput;
     }
 }

@@ -1,5 +1,6 @@
 import { Signal, createSignal } from './Signals';
 import { MAX_CHARGE_TIME, OVERHEAT_TIME, MOVE_SPEED, GROUND_Y } from './Constants';
+import { soundManager } from './SoundManager';
 
 export type FighterState =
     | 'IDLE'
@@ -108,6 +109,11 @@ export class Fighter {
     private executeAttack(chargeDuration: number) {
         this.state.value = 'ATTACKING';
         const isMaxCharge = chargeDuration >= MAX_CHARGE_TIME && chargeDuration < OVERHEAT_TIME;
+
+        // Audio
+        // const type = this.attackType.value === 'PUNCH' ? 'JAB' : 'HEAVY'; // TODO: distinct kick sounds
+        soundManager.playPunch(isMaxCharge ? 'HEAVY' : 'JAB');
+
         console.log(`Attack released! Type: ${this.attackType.value}, Height: ${this.attackHeight.value}, Charge: ${chargeDuration.toFixed(2)}s. Max? ${isMaxCharge}`);
 
         // Reset to idle after animation (mock)

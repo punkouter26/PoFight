@@ -7,8 +7,8 @@ test.describe('PoFight Core', () => {
         // Wait for "Loading Arena..." to disappear
         await expect(page.locator('text=Loading Arena...')).toBeHidden({ timeout: 10000 });
 
-        // Wait for SVG game stage to be present
-        await expect(page.locator('svg')).toBeVisible();
+        // Wait for WebGPU canvas to be present
+        await expect(page.locator('canvas')).toBeVisible();
 
         // Check for Fighters by text in HUD
         await expect(page.locator('h2', { hasText: 'PLAYER' })).toBeVisible();

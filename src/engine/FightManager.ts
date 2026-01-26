@@ -5,15 +5,24 @@ import { AIController } from './AIController';
 import { inputManager } from './InputManager';
 import { useGameStore } from '../store/gameState';
 import { ATTACK_FRAME_DATA, FIGHTER_WIDTH } from './Constants';
+import { soundManager } from './SoundManager';
+import { particleSystem } from './ParticleSystem';
+import { cameraSystem } from './CameraSystem';
+
+import { WebGPURenderer } from './renderer/WebGPURenderer';
 
 export class FightManager {
     public player: Fighter;
     public cpu: Fighter;
     public ai: AIController;
+    public playerAI?: AIController; // For CPU vs CPU
     private gameLoop: GameLoop;
+    private mode: 'PvCPU' | 'CPUvCPU';
+    private renderer: WebGPURenderer | null = null;
 
-    constructor(gameLoop: GameLoop) {
+    constructor(gameLoop: GameLoop, mode: 'PvCPU' | 'CPUvCPU') {
         this.gameLoop = gameLoop;
+        this.mode = mode;
 
         const store = useGameStore.getState();
         const level = store.currentLevel;
@@ -26,22 +35,37 @@ export class FightManager {
 
         this.ai = new AIController(this.cpu, this.player, level);
 
+        if (this.mode === 'CPUvCPU') {
+            this.playerAI = new AIController(this.player, this.cpu, 5); // Max level AI for player
+        }
+
         // Bind update
         gameLoop.setUpdateCallback(this.update.bind(this));
     }
 
+    public setRenderer(renderer: WebGPURenderer) {
+        this.renderer = renderer;
+    }
+
     update(dt: number) {
         // 1. Get Inputs
-        const playerInput = {
-            x: inputManager.getAxis().x,
-            y: inputManager.getAxis().y,
-            punchHeld: inputManager.isPressed('PUNCH'),
-            kickHeld: inputManager.isPressed('KICK')
-        };
+        let playerInput;
 
-
+        if (this.mode === 'CPUvCPU' && this.playerAI) {
+            this.playerAI.update(dt);
+            playerInput = this.playerAI.getInput();
+        } else {
+            // Human Input
+            playerInput = {
+                x: inputManager.getAxis().x,
+                y: inputManager.getAxis().y,
+                punchHeld: inputManager.isPressed('PUNCH'),
+                kickHeld: inputManager.isPressed('KICK')
+            };
+        }
 
         // AI Input
+        this.ai.update(dt);
         const cpuInput = this.ai.getInput();
 
         // 2. Update Fighters
@@ -62,6 +86,13 @@ export class FightManager {
         } else if (this.player.health.value <= 0) {
             this.handleLoss();
         }
+
+        // 6. Particles
+        // 6. Particles
+        particleSystem.update(dt);
+
+        // 7. Camera
+        cameraSystem.update(dt, [this.player, this.cpu]);
     }
 
     checkHits() {
@@ -89,6 +120,8 @@ export class FightManager {
 
         if (isBlockedHigh || isBlockedLow) {
             // Perfect block - no damage, attacker gets slight pushback
+            soundManager.playBlock();
+            particleSystem.emit((attacker.x.value + defender.x.value) / 2, defender.y.value - 100, 5, '#60a5fa'); // Blue spark
             console.log(`${defender.id} BLOCKED ${attackHeight}!`);
             return;
         }
@@ -96,6 +129,8 @@ export class FightManager {
         if (isBlockedMid) {
             // Mid attacks do chip damage through blocks
             const chipDamage = 2;
+            soundManager.playBlock(); // Chip block sound?
+            particleSystem.emit((attacker.x.value + defender.x.value) / 2, defender.y.value - 100, 3, '#93c5fd'); // Lighter blue
             defender.health.value = Math.max(0, defender.health.value - chipDamage);
             console.log(`${defender.id} blocked but took ${chipDamage} chip damage`);
             return;
@@ -115,6 +150,23 @@ export class FightManager {
         // Apply damage
         defender.health.value = Math.max(0, defender.health.value - baseDamage);
         defender.state.value = 'STUNNED';
+
+        const isHeavy = baseDamage > 15;
+        soundManager.playHit(isHeavy);
+
+        // Visual FX
+        if (this.renderer) {
+            // Shockwave at impact point (midpoint)
+            const midX = (attacker.x.value + defender.x.value) / 2;
+            const midY = defender.y.value - 100;
+            this.renderer.triggerShockwave(midX, midY, isHeavy ? 0.3 : 0.1);
+
+            // Glitch on heavy hit
+            if (isHeavy) {
+                this.renderer.setGlitch(0.5);
+                setTimeout(() => this.renderer?.setGlitch(0), 100);
+            }
+        }
 
         console.log(`${attacker.id} HIT ${defender.id} for ${baseDamage} damage! (${attackType} ${attackHeight})`);
 

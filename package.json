@@ -13,6 +13,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "gl-matrix": "^3.4.4",
     "idb-keyval": "^6.2.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -25,6 +26,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^5.1.2",
+    "@webgpu/types": "^0.1.69",
     "eslint": "^9",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.26",
