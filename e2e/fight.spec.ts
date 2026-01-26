@@ -3,6 +3,14 @@ import { test, expect } from '@playwright/test';
 test.describe('PoFight Core', () => {
     test('should load the game arena', async ({ page }) => {
         await page.goto('/');
+        // Pipe page console to test stdout for debugging
+        page.on('console', msg => console.log('PAGE:', msg.text()));
+
+        // Start a 1-player match from the home menu (ensure arena loads)
+        await page.click('text=1 PLAYER');
+
+        // On character select, press the Fight button to start match
+        await page.click('text=FIGHT!');
 
         // Wait for "Loading Arena..." to disappear
         await expect(page.locator('text=Loading Arena...')).toBeHidden({ timeout: 10000 });
@@ -17,6 +25,8 @@ test.describe('PoFight Core', () => {
 
     test('should charge attack when holding R', async ({ page }) => {
         await page.goto('/');
+        await page.click('text=1 PLAYER');
+        await page.click('text=FIGHT!');
         await expect(page.locator('text=Loading Arena...')).toBeHidden({ timeout: 10000 });
 
         const logs: string[] = [];
@@ -45,6 +55,8 @@ test.describe('PoFight Core', () => {
 
     test('should overheat if held too long', async ({ page }) => {
         await page.goto('/');
+        await page.click('text=1 PLAYER');
+        await page.click('text=FIGHT!');
         await expect(page.locator('text=Loading Arena...')).toBeHidden({ timeout: 10000 });
 
         const logs: string[] = [];

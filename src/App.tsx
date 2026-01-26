@@ -14,10 +14,12 @@ export default function App() {
   const handleSelectMode = (mode: GameMode) => {
     setGameMode(mode);
     setScreen('SELECT');
+    console.log('Screen -> SELECT, mode=', mode);
   };
 
   const handleStartGame = () => {
     setScreen('GAME');
+    console.log('Screen -> GAME');
   };
 
   return (

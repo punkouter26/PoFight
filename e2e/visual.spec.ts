@@ -3,6 +3,10 @@ import { test, expect } from '@playwright/test';
 test.describe('Visual Regression', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/');
+        // Start match: select 1 player and press fight
+        page.on('console', msg => console.log('PAGE:', msg.text()));
+        await page.click('text=1 PLAYER');
+        await page.click('text=FIGHT!');
         await expect(page.locator('text=Loading Arena...')).toBeHidden({ timeout: 10000 });
     });
 

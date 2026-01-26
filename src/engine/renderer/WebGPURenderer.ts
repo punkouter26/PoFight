@@ -268,15 +268,25 @@ export class WebGPURenderer {
         }
 
         // Recreate Post Bind Group
-        // We need pipeline layout to be ready.
+        // We need pipeline layout to be ready. Recreate bind groups that depend on the scene texture.
+        if (this.postPipeline) {
+            this.bindGroupPost = this.device.createBindGroup({
+                layout: this.postPipeline.getBindGroupLayout(0),
+                entries: [
+                    { binding: 0, resource: this.sceneTextureView },
+                    { binding: 1, resource: this.sampler },
+                    { binding: 2, resource: { buffer: this.postUniformBuffer } },
+                ],
+            });
+        }
         if (this.godrayPipeline) {
             this.bindGroupGodrays = this.device.createBindGroup({
                 layout: this.godrayPipeline.getBindGroupLayout(0),
                 entries: [
                     { binding: 0, resource: this.sceneTextureView }, // Using scene texture as source for rays
                     { binding: 1, resource: this.sampler },
-                    { binding: 2, resource: { buffer: this.godrayUniformBuffer } }
-                ]
+                    { binding: 2, resource: { buffer: this.godrayUniformBuffer } },
+                ],
             });
         }
     }
@@ -388,14 +398,6 @@ export class WebGPURenderer {
             entries: [{ binding: 0, resource: { buffer: this.uniformBuffer } }],
         });
 
-        // Sprite Storage Group (Group 1 in shader)
-        // We need to verify layout indices.
-        // Actually, sprite shader group 0 is camera, group 1 is sprites.
-        // Let's create group 1 for sprites.
-        // NOTE: I need to store this bindGroup separately or just recreate it? Creating once is better.
-
-
-
         if (this.backgroundPipeline) {
             this.bindGroupBackground = this.device.createBindGroup({
                 layout: this.backgroundPipeline.getBindGroupLayout(0),
@@ -404,11 +406,35 @@ export class WebGPURenderer {
                 ]
             });
         }
-
         this.bindGroupShadow = this.device.createBindGroup({
             layout: this.spritePipeline.getBindGroupLayout(0), // Reuse sprite layout (Group 0 is Camera/Uniforms)
             entries: [{ binding: 0, resource: { buffer: this.shadowUniformBuffer } }],
         });
+
+        // If scene texture and sampler are available, create post and godray bind groups.
+        if (this.sceneTextureView && this.sampler) {
+            if (this.postPipeline) {
+                this.bindGroupPost = this.device.createBindGroup({
+                    layout: this.postPipeline.getBindGroupLayout(0),
+                    entries: [
+                        { binding: 0, resource: this.sceneTextureView },
+                        { binding: 1, resource: this.sampler },
+                        { binding: 2, resource: { buffer: this.postUniformBuffer } },
+                    ],
+                });
+            }
+
+            if (this.godrayPipeline) {
+                this.bindGroupGodrays = this.device.createBindGroup({
+                    layout: this.godrayPipeline.getBindGroupLayout(0),
+                    entries: [
+                        { binding: 0, resource: this.sceneTextureView },
+                        { binding: 1, resource: this.sampler },
+                        { binding: 2, resource: { buffer: this.godrayUniformBuffer } },
+                    ],
+                });
+            }
+        }
     }
 
     public triggerShockwave(x: number, y: number, amplitude: number = 1.0) {
