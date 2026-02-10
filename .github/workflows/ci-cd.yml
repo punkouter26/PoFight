@@ -109,11 +109,15 @@ jobs:
       - name: Publish API
         run: dotnet publish api/PoFight.API.csproj -c Release -o publish
 
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
       - name: Deploy to Azure App Service
         uses: azure/webapps-deploy@v3
         with:
           app-name: app-pofight-api
-          publish-profile: ${{ secrets.AZURE_API_PUBLISH_PROFILE }}
           package: publish
 
   close_pull_request:
