@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Fighter } from '../Fighter';
-import { GROUND_Y, MOVE_SPEED } from '../Constants';
+import { GROUND_Y, MOVE_SPEED, JUMP_VELOCITY, GRAVITY } from '../Constants';
 
 describe('Fighter', () => {
     let fighter: Fighter;
@@ -37,6 +37,10 @@ describe('Fighter', () => {
 
         it('should start with zero charge', () => {
             expect(fighter.chargeLevel.value).toBe(0);
+        });
+
+        it('should report isGrounded when at GROUND_Y', () => {
+            expect(fighter.isGrounded).toBe(true);
         });
     });
 
@@ -87,30 +91,68 @@ describe('Fighter', () => {
     });
 
     describe('Blocking', () => {
-        it('should block high when y input is positive', () => {
-            fighter.update(0.016, { x: 0, y: 1, punchHeld: false, kickHeld: false });
-            expect(fighter.state.value).toBe('BLOCKING_HIGH');
-        });
-
-        it('should block low when y input is negative', () => {
+        it('should block when y input is negative (DOWN)', () => {
             fighter.update(0.016, { x: 0, y: -1, punchHeld: false, kickHeld: false });
-            expect(fighter.state.value).toBe('BLOCKING_LOW');
+            expect(fighter.state.value).toBe('BLOCKING');
         });
 
         it('should return to IDLE when blocking stops', () => {
-            fighter.update(0.016, { x: 0, y: 1, punchHeld: false, kickHeld: false });
-            expect(fighter.state.value).toBe('BLOCKING_HIGH');
+            fighter.update(0.016, { x: 0, y: -1, punchHeld: false, kickHeld: false });
+            expect(fighter.state.value).toBe('BLOCKING');
             
             fighter.update(0.016, { x: 0, y: 0, punchHeld: false, kickHeld: false });
             expect(fighter.state.value).toBe('IDLE');
         });
 
-        it('should not move while blocking', () => {
-            const initialX = fighter.x.value;
-            fighter.update(0.016, { x: 1, y: 1, punchHeld: false, kickHeld: false });
+        it('should not charge while blocking', () => {
+            fighter.update(0.016, { x: 0, y: -1, punchHeld: true, kickHeld: false });
             
-            // Due to the order of operations, blocking takes priority
-            expect(fighter.state.value).toBe('BLOCKING_HIGH');
+            expect(fighter.state.value).toBe('BLOCKING');
+            expect(fighter.chargeLevel.value).toBe(0);
+        });
+    });
+
+    describe('Jumping', () => {
+        it('should jump when y input is positive (UP)', () => {
+            fighter.update(0.016, { x: 0, y: 1, punchHeld: false, kickHeld: false });
+            expect(fighter.state.value).toBe('JUMPING');
+        });
+
+        it('should apply jump velocity when jumping', () => {
+            fighter.update(0.016, { x: 0, y: 1, punchHeld: false, kickHeld: false });
+            expect(fighter.y.value).toBeLessThan(GROUND_Y);
+        });
+
+        it('should allow horizontal movement during jump', () => {
+            const initialX = fighter.x.value;
+            // Start jump
+            fighter.update(0.016, { x: 1, y: 1, punchHeld: false, kickHeld: false });
+            expect(fighter.state.value).toBe('JUMPING');
+            expect(fighter.x.value).toBeGreaterThan(initialX);
+        });
+
+        it('should land and return to IDLE', () => {
+            // Jump
+            fighter.update(0.016, { x: 0, y: 1, punchHeld: false, kickHeld: false });
+            expect(fighter.state.value).toBe('JUMPING');
+            
+            // Simulate enough time for full jump arc
+            for (let i = 0; i < 200; i++) {
+                fighter.update(0.016, { x: 0, y: 0, punchHeld: false, kickHeld: false });
+            }
+            
+            expect(fighter.y.value).toBe(GROUND_Y);
+            expect(fighter.state.value).toBe('IDLE');
+        });
+
+        it('should not jump while charging', () => {
+            vi.spyOn(performance, 'now').mockReturnValue(0);
+            fighter.update(0.016, { x: 0, y: 0, punchHeld: true, kickHeld: false });
+            expect(fighter.state.value).toBe('CHARGING');
+            
+            // Try to jump while charging
+            fighter.update(0.016, { x: 0, y: 1, punchHeld: true, kickHeld: false });
+            expect(fighter.state.value).toBe('CHARGING');
         });
     });
 
@@ -146,10 +188,37 @@ describe('Fighter', () => {
         });
 
         it('should not charge while blocking', () => {
-            fighter.update(0.016, { x: 0, y: 1, punchHeld: true, kickHeld: false });
+            fighter.update(0.016, { x: 0, y: -1, punchHeld: true, kickHeld: false });
             
-            expect(fighter.state.value).toBe('BLOCKING_HIGH');
+            expect(fighter.state.value).toBe('BLOCKING');
             expect(fighter.chargeLevel.value).toBe(0);
+        });
+    });
+
+    describe('Wind-up Progress', () => {
+        it('should reach full wind-up at WIND_UP_TIME (0.5s)', () => {
+            const nowMock = vi.spyOn(performance, 'now');
+            nowMock.mockReturnValue(0);
+            
+            fighter.update(0.016, { x: 0, y: 0, punchHeld: true, kickHeld: false });
+            
+            // At 0.5s, chargeLevel = 0.5, windUp should be 1.0
+            nowMock.mockReturnValue(500);
+            fighter.update(0.016, { x: 0, y: 0, punchHeld: true, kickHeld: false });
+            
+            expect(fighter.windUpProgress).toBe(1.0);
+        });
+
+        it('should clamp wind-up at 1.0 even when charge exceeds wind-up ratio', () => {
+            const nowMock = vi.spyOn(performance, 'now');
+            nowMock.mockReturnValue(0);
+            
+            fighter.update(0.016, { x: 0, y: 0, punchHeld: true, kickHeld: false });
+            
+            nowMock.mockReturnValue(800); // 0.8s → chargeLevel=0.8, windUp clamped at 1.0
+            fighter.update(0.016, { x: 0, y: 0, punchHeld: true, kickHeld: false });
+            
+            expect(fighter.windUpProgress).toBe(1.0);
         });
     });
 });

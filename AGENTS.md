@@ -68,5 +68,9 @@ You sit between human intent (directives) and deterministic execution (Python sc
 
 Be pragmatic. Be reliable. Self-anneal.
 
+## Coding Rules Reference
+
+All coding standards, naming conventions, testing strategy, and architectural rules are maintained in `directives/coding-rules.md`. Read and follow that directive for every implementation task.
+
 
 

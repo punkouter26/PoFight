@@ -1,0 +1,11 @@
+@PoFight.API_HostAddress = http://localhost:5000
+
+### Health Check
+GET {{PoFight.API_HostAddress}}/health
+Accept: application/json
+
+### Diagnostics (masked values)
+GET {{PoFight.API_HostAddress}}/diag
+Accept: application/json
+
+###

@@ -71,7 +71,7 @@ describe('Hit Detection', () => {
             expect(attacker.attackType.value).toBe('KICK');
         });
 
-        it('should track attack height based on y input at release', () => {
+        it('should attack at body level (no height modifier)', () => {
             vi.spyOn(performance, 'now').mockReturnValue(0);
             
             // Start charging
@@ -80,74 +80,31 @@ describe('Hit Detection', () => {
             vi.spyOn(performance, 'now').mockReturnValue(500);
             attacker.update(0.016, { x: 0, y: 0, punchHeld: true, kickHeld: false });
             
-            // Release with UP held (HIGH attack)
-            attacker.update(0.016, { x: 0, y: 1, punchHeld: false, kickHeld: false });
-            expect(attacker.attackHeight.value).toBe('HIGH');
-        });
-
-        it('should set LOW attack height when releasing with DOWN', () => {
-            vi.spyOn(performance, 'now').mockReturnValue(0);
-            
-            attacker.update(0.016, { x: 0, y: 0, punchHeld: true, kickHeld: false });
-            
-            vi.spyOn(performance, 'now').mockReturnValue(500);
-            attacker.update(0.016, { x: 0, y: 0, punchHeld: true, kickHeld: false });
-            
-            // Release with DOWN held (LOW attack)
-            attacker.update(0.016, { x: 0, y: -1, punchHeld: false, kickHeld: false });
-            expect(attacker.attackHeight.value).toBe('LOW');
-        });
-
-        it('should default to MID attack height', () => {
-            vi.spyOn(performance, 'now').mockReturnValue(0);
-            
-            attacker.update(0.016, { x: 0, y: 0, punchHeld: true, kickHeld: false });
-            
-            vi.spyOn(performance, 'now').mockReturnValue(500);
-            attacker.update(0.016, { x: 0, y: 0, punchHeld: true, kickHeld: false });
-            
-            // Release with no directional input
+            // Release — no attackHeight signal on fighter
             attacker.update(0.016, { x: 0, y: 0, punchHeld: false, kickHeld: false });
-            expect(attacker.attackHeight.value).toBe('MID');
+            expect(attacker.state.value).toBe('ATTACKING');
+            expect(attacker.attackType.value).toBe('PUNCH');
         });
     });
 
     describe('Blocking Interaction', () => {
-        it('defender blocking HIGH should be in BLOCKING_HIGH state', () => {
-            defender.update(0.016, { x: 0, y: 1, punchHeld: false, kickHeld: false });
-            expect(defender.state.value).toBe('BLOCKING_HIGH');
-        });
-
-        it('defender blocking LOW should be in BLOCKING_LOW state', () => {
+        it('defender blocking DOWN should be in BLOCKING state', () => {
             defender.update(0.016, { x: 0, y: -1, punchHeld: false, kickHeld: false });
-            expect(defender.state.value).toBe('BLOCKING_LOW');
+            expect(defender.state.value).toBe('BLOCKING');
         });
 
-        it('block height should match attack height for successful block (HIGH)', () => {
-            // Setup attacker with HIGH attack
-            attacker.attackHeight.value = 'HIGH';
+        it('block should protect against any attack', () => {
             attacker.state.value = 'ATTACKING';
+            attacker.attackType.value = 'PUNCH';
             
-            // Defender blocks HIGH
-            defender.update(0.016, { x: 0, y: 1, punchHeld: false, kickHeld: false });
-            
-            // Block matches attack height
-            const blockMatchesAttack = 
-                (attacker.attackHeight.value === 'HIGH' && defender.state.value === 'BLOCKING_HIGH');
-            
-            expect(blockMatchesAttack).toBe(true);
-        });
-
-        it('block height mismatch should fail (HIGH attack vs LOW block)', () => {
-            attacker.attackHeight.value = 'HIGH';
-            attacker.state.value = 'ATTACKING';
-            
+            // Defender blocks
             defender.update(0.016, { x: 0, y: -1, punchHeld: false, kickHeld: false });
-            
-            const blockFails = 
-                (attacker.attackHeight.value === 'HIGH' && defender.state.value === 'BLOCKING_LOW');
-            
-            expect(blockFails).toBe(true);
+            expect(defender.state.value).toBe('BLOCKING');
+        });
+
+        it('UP should jump instead of block', () => {
+            defender.update(0.016, { x: 0, y: 1, punchHeld: false, kickHeld: false });
+            expect(defender.state.value).toBe('JUMPING');
         });
     });
 

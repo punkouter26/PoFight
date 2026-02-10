@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Launch PoFight",
+      "name": "Launch Client (Chrome)",
       "type": "chrome",
       "request": "launch",
       "url": "http://localhost:3000",
@@ -13,12 +13,31 @@
       }
     },
     {
-      "name": "Launch PoFight (Edge)",
+      "name": "Launch Client (Edge)",
       "type": "msedge",
       "request": "launch",
       "url": "http://localhost:3000",
       "webRoot": "${workspaceFolder}/src",
       "preLaunchTask": "npm: dev"
+    },
+    {
+      "name": "Launch API (.NET)",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/api/bin/Debug/net10.0/PoFight.API.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/api",
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "preLaunchTask": "kill-dotnet"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Launch PoFight (Full Stack)",
+      "configurations": ["Launch Client (Edge)", "Launch API (.NET)"],
+      "stopAll": true
     }
   ]
 }

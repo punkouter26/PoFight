@@ -94,10 +94,7 @@ export class AIController {
                 this.currentInput.x = -directionToOpponent;
                 break;
             case 'BLOCK':
-                this.currentInput.y = 1; // High block default
-                if (this.opponent.attackHeight.peek() === 'LOW' && Math.random() > this.mistakeRate) {
-                    this.currentInput.y = -1;
-                }
+                this.currentInput.y = -1; // DOWN = block
                 break;
             case 'CHARGE':
                 this.currentInput.punchHeld = true;

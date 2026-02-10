@@ -6,8 +6,13 @@ export const FIGHTER_WIDTH = 100;
 export const FIGHTER_HEIGHT = 200;
 export const MOVE_SPEED = 400; // pixels per second
 
-export const MAX_CHARGE_TIME = 1.0;
+export const MAX_CHARGE_TIME = 1.0;   // seconds to reach full power
+export const WIND_UP_TIME = 0.5;      // seconds for visual wind-up to complete
 export const OVERHEAT_TIME = 2.0;
+
+// Jump physics
+export const JUMP_VELOCITY = -600;     // initial upward velocity (negative = up in screen coords)
+export const GRAVITY = 1800;           // pixels per second squared
 
 export const ATTACK_FRAME_DATA = {
     JAB: { damage: 5, duration: 0.2, recovery: 0.1 },

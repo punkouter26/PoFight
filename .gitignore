@@ -52,3 +52,9 @@ next-env.d.ts
 *_log.txt
 e2e_debug_log*.txt
 lint_log.txt
+
+# .NET build output
+api/bin/
+api/obj/
+publish/
+test_output.txt

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, memo } from 'react';
 import { Fighter } from '@/engine/Fighter';
-import { FIGHTER_WIDTH, FIGHTER_HEIGHT } from '@/engine/Constants';
+import { FIGHTER_WIDTH, FIGHTER_HEIGHT, WIND_UP_TIME, MAX_CHARGE_TIME } from '@/engine/Constants';
 
 interface FighterViewProps {
     fighter: Fighter;
@@ -16,10 +16,15 @@ export const FighterView = memo(function FighterView({ fighter }: FighterViewPro
     const rightLegRef = useRef<SVGPathElement>(null);
 
     useEffect(() => {
-        // Subscribe to Position Updates (60FPS)
+        // Subscribe to Position Updates (60FPS) — includes Y for jump
         const unsubX = fighter.x.subscribe((val) => {
             if (gRef.current) {
                 gRef.current.style.transform = `translate(${val}px, ${fighter.y.value}px)`;
+            }
+        });
+        const unsubY = fighter.y.subscribe((val) => {
+            if (gRef.current) {
+                gRef.current.style.transform = `translate(${fighter.x.value}px, ${val}px)`;
             }
         });
 
@@ -29,8 +34,8 @@ export const FighterView = memo(function FighterView({ fighter }: FighterViewPro
                 let color = '#3b82f6'; // Blue-500 default
                 if (state === 'CHARGING') color = '#fbbf24'; // Amber-400
                 if (state === 'ATTACKING') color = '#ef4444'; // Red-500
-                if (state === 'BLOCKING_HIGH') color = '#38bdf8'; // Sky-400
-                if (state === 'BLOCKING_LOW') color = '#7dd3fc'; // Sky-300
+                if (state === 'BLOCKING') color = '#38bdf8'; // Sky-400
+                if (state === 'JUMPING') color = '#a78bfa'; // Violet-400
                 if (state === 'OVERHEATED') color = '#78716c'; // Stone-500
                 if (state === 'STUNNED') color = '#f97316'; // Orange-500
 
@@ -41,29 +46,23 @@ export const FighterView = memo(function FighterView({ fighter }: FighterViewPro
                 bodyRef.current.style.color = color;
 
                 // Pose Logic
+                const cx = FIGHTER_WIDTH / 2;
                 if (state === 'ATTACKING') {
-                    const type = fighter.attackType.peek(); // Use peek to avoid subscription recursion if synced
-                    const height = fighter.attackHeight.peek();
+                    const type = fighter.attackType.peek();
 
                     if (type === 'PUNCH') {
-                        // Extend Right Arm
-                        let armPath = `M ${FIGHTER_WIDTH / 2 + 15},55 L ${FIGHTER_WIDTH / 2 + 60},55`; // Mid default
-                        if (height === 'HIGH') armPath = `M ${FIGHTER_WIDTH / 2 + 15},55 L ${FIGHTER_WIDTH / 2 + 50},30`;
-                        if (height === 'LOW') armPath = `M ${FIGHTER_WIDTH / 2 + 15},55 L ${FIGHTER_WIDTH / 2 + 50},80`;
-
+                        // Body-level punch — arm extends forward
+                        const armPath = `M ${cx + 15},55 L ${cx + 60},55`;
                         if (rightArmRef.current) rightArmRef.current.setAttribute('d', armPath);
                     } else if (type === 'KICK') {
-                        // Extend Right Leg
-                        let legPath = `M ${FIGHTER_WIDTH / 2 + 10},110 L ${FIGHTER_WIDTH / 2 + 60},110`; // Mid/Body default
-                        if (height === 'HIGH') legPath = `M ${FIGHTER_WIDTH / 2 + 10},110 L ${FIGHTER_WIDTH / 2 + 50},40`; // Head kick
-                        if (height === 'LOW') legPath = `M ${FIGHTER_WIDTH / 2 + 10},110 L ${FIGHTER_WIDTH / 2 + 60},180`; // Low kick
-
+                        // Body-level kick — leg extends forward
+                        const legPath = `M ${cx + 10},110 L ${cx + 60},110`;
                         if (rightLegRef.current) rightLegRef.current.setAttribute('d', legPath);
                     }
                 } else {
-                    // Reset Poses
-                    if (rightArmRef.current) rightArmRef.current.setAttribute('d', `M ${FIGHTER_WIDTH / 2 + 15},55 L ${FIGHTER_WIDTH / 2 + 30},80 L ${FIGHTER_WIDTH / 2 + 45},60`);
-                    if (rightLegRef.current) rightLegRef.current.setAttribute('d', `M ${FIGHTER_WIDTH / 2 + 10},110 L ${FIGHTER_WIDTH / 2 + 25},190`);
+                    // Reset Poses (guard position)
+                    if (rightArmRef.current) rightArmRef.current.setAttribute('d', `M ${cx + 15},55 L ${cx + 30},80 L ${cx + 45},60`);
+                    if (rightLegRef.current) rightLegRef.current.setAttribute('d', `M ${cx + 10},110 L ${cx + 25},190`);
                 }
             }
         });
@@ -74,10 +73,41 @@ export const FighterView = memo(function FighterView({ fighter }: FighterViewPro
                 chargeRef.current.setAttribute('r', (level * 60 + 10).toString());
                 chargeRef.current.setAttribute('opacity', (level * 0.5).toString());
             }
+
+            // Wind-up animation: pull arm/leg back progressively while charging
+            // Visual wind-up completes at WIND_UP_TIME (0.5s), power continues to MAX_CHARGE_TIME (1.0s)
+            const currentState = fighter.state.peek();
+            if (currentState === 'CHARGING') {
+                const type = fighter.attackType.peek();
+                const cx = FIGHTER_WIDTH / 2;
+                const windUpRatio = WIND_UP_TIME / MAX_CHARGE_TIME; // 0.5
+                const windUp = Math.min(level / windUpRatio, 1.0); // reaches 1.0 at 0.5s
+
+                if (type === 'PUNCH' && rightArmRef.current) {
+                    // Arm pulls back from guard position to fully cocked behind shoulder
+                    const elbowX = cx + 30 - windUp * 40;
+                    const elbowY = 80 - windUp * 15;
+                    const fistX = cx + 45 - windUp * 70;
+                    const fistY = 60 - windUp * 15;
+                    rightArmRef.current.setAttribute('d',
+                        `M ${cx + 15},55 L ${elbowX},${elbowY} L ${fistX},${fistY}`);
+                }
+
+                if (type === 'KICK' && rightLegRef.current) {
+                    // Leg chambers: knee bends, foot pulls up and back
+                    const kneeX = cx + 17 - windUp * 12;
+                    const kneeY = 150;
+                    const footX = cx + 25 - windUp * 40;
+                    const footY = 190 - windUp * 65;
+                    rightLegRef.current.setAttribute('d',
+                        `M ${cx + 10},110 L ${kneeX},${kneeY} L ${footX},${footY}`);
+                }
+            }
         });
 
         return () => {
             unsubX();
+            unsubY();
             unsubState();
             unsubCharge();
         };
@@ -90,7 +120,8 @@ export const FighterView = memo(function FighterView({ fighter }: FighterViewPro
 
     return (
         <g 
-            ref={gRef} 
+            ref={gRef}
+            data-testid={`fighter-${fighter.id}`}
             style={{ 
                 transform: `translate(${fighter.x.value}px, ${fighter.y.value}px)`,
                 willChange: 'transform',
@@ -102,6 +133,7 @@ export const FighterView = memo(function FighterView({ fighter }: FighterViewPro
             {/* Charge Aura (Behind) */}
             <circle
                 ref={chargeRef}
+                data-testid={`charge-aura-${fighter.id}`}
                 cx={FIGHTER_WIDTH / 2}
                 cy={FIGHTER_HEIGHT / 2}
                 r="0"
@@ -130,11 +162,11 @@ export const FighterView = memo(function FighterView({ fighter }: FighterViewPro
 
                 {/* Arms (Resting Pose) */}
                 <path d={`M ${FIGHTER_WIDTH / 2 - 15},55 L ${FIGHTER_WIDTH / 2 - 30},90`} stroke="currentColor" strokeWidth="10" strokeLinecap="round" />
-                <path ref={rightArmRef} d={`M ${FIGHTER_WIDTH / 2 + 15},55 L ${FIGHTER_WIDTH / 2 + 30},80 L ${FIGHTER_WIDTH / 2 + 45},60`} stroke="currentColor" strokeWidth="10" strokeLinecap="round" /> {/* Guard up slightly */}
+                <path ref={rightArmRef} data-testid={`right-arm-${fighter.id}`} d={`M ${FIGHTER_WIDTH / 2 + 15},55 L ${FIGHTER_WIDTH / 2 + 30},80 L ${FIGHTER_WIDTH / 2 + 45},60`} stroke="currentColor" strokeWidth="10" strokeLinecap="round" /> {/* Guard up slightly */}
 
                 {/* Legs */}
                 <path d={`M ${FIGHTER_WIDTH / 2 - 10},110 L ${FIGHTER_WIDTH / 2 - 20},190`} stroke="currentColor" strokeWidth="12" strokeLinecap="round" />
-                <path ref={rightLegRef} d={`M ${FIGHTER_WIDTH / 2 + 10},110 L ${FIGHTER_WIDTH / 2 + 25},190`} stroke="currentColor" strokeWidth="12" strokeLinecap="round" />
+                <path ref={rightLegRef} data-testid={`right-leg-${fighter.id}`} d={`M ${FIGHTER_WIDTH / 2 + 10},110 L ${FIGHTER_WIDTH / 2 + 25},190`} stroke="currentColor" strokeWidth="12" strokeLinecap="round" />
 
                 {/* Belt/Sash */}
                 <rect x={FIGHTER_WIDTH / 2 - 12} y={100} width={24} height={6} fill="rgba(0,0,0,0.3)" />

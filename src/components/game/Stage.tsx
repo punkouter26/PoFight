@@ -14,8 +14,13 @@ import { WebGPUCanvas } from './WebGPUCanvas';
 
 
 const GameCanvas = memo(function GameCanvas({ manager }: { manager: FightManager }) {
-    const [renderer, setRenderer] = useState<'webgpu' | 'legacy'>('webgpu');
-    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const forceRenderer = new URLSearchParams(window.location.search).get('renderer');
+    const [renderer, setRenderer] = useState<'webgpu' | 'legacy'>(
+        forceRenderer === 'legacy' ? 'legacy' : 'webgpu'
+    );
+    const [errorMsg, setErrorMsg] = useState<string | null>(
+        forceRenderer === 'legacy' ? 'Forced via query param' : null
+    );
     const viewBox = useSignal(cameraSystem.viewBox);
 
     const handleWebGPUError = (e: Error) => {

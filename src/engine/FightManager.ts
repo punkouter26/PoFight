@@ -110,29 +110,16 @@ export class FightManager {
 
         if (distance > attackRange) return;
 
-        // Check if defender is blocking correctly
-        const attackHeight = attacker.attackHeight.value;
-        const defenderState = defender.state.value;
+        // Check if defender is blocking
+        const isBlocked = defender.state.value === 'BLOCKING';
 
-        const isBlockedHigh = defenderState === 'BLOCKING_HIGH' && attackHeight === 'HIGH';
-        const isBlockedLow = defenderState === 'BLOCKING_LOW' && attackHeight === 'LOW';
-        const isBlockedMid = (defenderState === 'BLOCKING_HIGH' || defenderState === 'BLOCKING_LOW') && attackHeight === 'MID';
-
-        if (isBlockedHigh || isBlockedLow) {
-            // Perfect block - no damage, attacker gets slight pushback
-            soundManager.playBlock();
-            particleSystem.emit((attacker.x.value + defender.x.value) / 2, defender.y.value - 100, 5, '#60a5fa'); // Blue spark
-            console.log(`${defender.id} BLOCKED ${attackHeight}!`);
-            return;
-        }
-
-        if (isBlockedMid) {
-            // Mid attacks do chip damage through blocks
+        if (isBlocked) {
+            // Block reduces damage to chip only
             const chipDamage = 2;
-            soundManager.playBlock(); // Chip block sound?
-            particleSystem.emit((attacker.x.value + defender.x.value) / 2, defender.y.value - 100, 3, '#93c5fd'); // Lighter blue
+            soundManager.playBlock();
+            particleSystem.emit((attacker.x.value + defender.x.value) / 2, defender.y.value - 100, 5, '#60a5fa');
             defender.health.value = Math.max(0, defender.health.value - chipDamage);
-            console.log(`${defender.id} blocked but took ${chipDamage} chip damage`);
+            console.log(`${defender.id} BLOCKED! Chip: ${chipDamage}`);
             return;
         }
 
@@ -156,23 +143,22 @@ export class FightManager {
 
         // Visual FX
         if (this.renderer) {
-            // Shockwave at impact point (midpoint)
             const midX = (attacker.x.value + defender.x.value) / 2;
             const midY = defender.y.value - 100;
             this.renderer.triggerShockwave(midX, midY, isHeavy ? 0.3 : 0.1);
 
-            // Glitch on heavy hit
             if (isHeavy) {
                 this.renderer.setGlitch(0.5);
                 setTimeout(() => this.renderer?.setGlitch(0), 100);
             }
         }
 
-        console.log(`${attacker.id} HIT ${defender.id} for ${baseDamage} damage! (${attackType} ${attackHeight})`);
+        console.log(`${attacker.id} HIT ${defender.id} for ${baseDamage} damage! (${attackType})`);
 
         // Reset attacker to prevent multi-hit
         attacker.state.value = 'IDLE';
         attacker.attackType.value = 'NONE';
+        attacker.chargeLevel.value = 0;
 
         // Stun recovery
         setTimeout(() => {

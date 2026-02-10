@@ -2,10 +2,36 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "kill-dotnet",
+      "type": "shell",
+      "command": "taskkill /F /IM dotnet.exe /T 2>$null; exit 0",
+      "presentation": { "reveal": "silent", "close": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "dotnet: run api",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["run", "--project", "${workspaceFolder}/api/PoFight.API.csproj"],
+      "isBackground": true,
+      "dependsOn": "kill-dotnet",
+      "problemMatcher": {
+        "owner": "dotnet",
+        "pattern": { "regexp": "^$" },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Building\\.\\.\\.",
+          "endsPattern": "Now listening on"
+        }
+      },
+      "presentation": { "reveal": "silent", "panel": "dedicated" }
+    },
+    {
       "label": "npm: dev",
       "type": "npm",
       "script": "dev",
       "isBackground": true,
+      "dependsOn": "kill-dotnet",
       "problemMatcher": {
         "owner": "vite",
         "pattern": {
