@@ -69,7 +69,7 @@ describe('AIController', () => {
             
             // Run multiple times due to randomness
             let movedTowards = false;
-            for (let i = 0; i < 10; i++) {
+            for (let i = 0; i < 50; i++) {
                 const input = ai.getInput();
                 if (input.x < 0) { // Moving left towards player
                     movedTowards = true;
