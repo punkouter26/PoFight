@@ -67,9 +67,10 @@ describe('AIController', () => {
             aiFighter.x.value = 1200;
             player.x.value = 400;
             
-            // Run multiple times due to randomness
+            // Call update() to trigger state transitions, then check input
             let movedTowards = false;
             for (let i = 0; i < 50; i++) {
+                ai.update(1.0); // large dt guarantees state transition
                 const input = ai.getInput();
                 if (input.x < 0) { // Moving left towards player
                     movedTowards = true;
