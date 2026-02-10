@@ -37,9 +37,6 @@ export class WebGPURenderer {
     private simParamsBuffer!: GPUBuffer;
     private fluidParamsBuffer!: GPUBuffer; // New
 
-    private bindGroupSprite!: GPUBindGroup;
-    private bindGroupParticles!: GPUBindGroup;
-    private bindGroupSimParams!: GPUBindGroup;
     private bindGroupPost!: GPUBindGroup;
     private bindGroupBackground!: GPUBindGroup;
     private bindGroupGodrays!: GPUBindGroup;
@@ -393,7 +390,8 @@ export class WebGPURenderer {
     }
 
     private createBindGroups() {
-        this.bindGroupSprite = this.device.createBindGroup({
+        // Bind group for sprites is created inline during render
+        void this.device.createBindGroup({
             layout: this.spritePipeline.getBindGroupLayout(0),
             entries: [{ binding: 0, resource: { buffer: this.uniformBuffer } }],
         });
@@ -459,7 +457,7 @@ export class WebGPURenderer {
         // 1. Update Uniforms
         const projection = mat4.create();
         mat4.ortho(projection, 0, 800, 600, 0, -1, 1);
-        this.device.queue.writeBuffer(this.uniformBuffer, 0, projection as Float32Array);
+        this.device.queue.writeBuffer(this.uniformBuffer, 0, (projection as Float32Array).buffer);
 
         // 2. Update Sprite Buffer
         const spriteData = new Float32Array(this.fighters.length * 12);
@@ -658,7 +656,7 @@ export class WebGPURenderer {
         // Let's add translation to Y?
         shadowMat[13] = 10.0; // Offset Y
 
-        this.device.queue.writeBuffer(this.shadowUniformBuffer, 0, shadowMat as Float32Array);
+        this.device.queue.writeBuffer(this.shadowUniformBuffer, 0, (shadowMat as Float32Array).buffer);
 
         const bgSprites0 = this.device.createBindGroup({
             layout: this.spritePipeline.getBindGroupLayout(0),
